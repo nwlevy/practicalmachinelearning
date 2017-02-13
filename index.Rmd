@@ -1,0 +1,79 @@
+---
+title: "Practical Machine Learning Project"
+author: "Noah Levy"
+date: "February 11, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Overview
+
+The goal of this exercise is to use the movement data in the Weight Lifting Exercises Dataset to predict how each of six participants performed a particular barbell exercise. The training set consists of roughly 20,000 observations of 160 variables.  The last variable, classe, indicates whether the user performed the excersise correctly (class A) or whether they performed it in one of the incorrect fashions (classes B-E).  
+
+#Pre-Processing
+
+The analysis begins by reading in the training set, and the 20-case test set.
+
+```{r, echo=FALSE,cache=TRUE}
+training_URL<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_URL<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training<-read.csv(training_URL)
+testing<-read.csv(testing_URL)
+```
+
+The training set was then sub-divided into a training set and a cross-validation set to assess the performance of each algorithm.  Seventy percent of the training data was allocated towards the training set, and the other thirty percent of the data was allocated towards the cross validation set
+
+
+```{r,echo=FALSE}
+library(caret)
+set.seed(323)
+intrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+train_set<-training[intrain,]
+test_set<-training[-intrain,]
+```
+
+Many of the predictors in the training set contain missing values. To avoid analyzing these variables, the algorithm analysis was limited to 60 variables for which the corresponding variable in the 20-sample test set had at least one non-null value.
+
+```{r,echo=FALSE}
+testing_subset<-testing[,colSums(is.na(testing))<nrow(testing)]
+relevant_cols<-colnames(testing_subset[,2:59])
+```
+
+#Classification - Attempt #1
+
+A tree classification algorithm was then used to predict the classe variable in the training set based on the 60 relevant variables.  The performance of this algorithm can be seen below.
+
+###Figure 1 : Tree classification using 60 relevant variables in training set
+
+```{r,echo=FALSE,cache=TRUE}
+modFit2<-train(classe~.,method="rpart",data=train_set[,c(relevant_cols,"classe")])
+print(modFit2$finalModel)
+preds2<-predict(modFit2,newdata=test_set[,c(relevant_cols,"classe")])
+comp2<-table(preds2,test_set$classe)
+comp2
+```
+
+The out-of-sample-error metric for this algorithm is accuracy.  Of the 5,885 cases in the cross-validation set, 3,650 were classified correctly.  Thus, this model has 62 % accuracy.  An illulstraion of the final model is as follows:
+
+###Figure 2 : Classification Hierarcy
+```{r,echo=FALSE,cache=TRUE,fig.width=8.5,fig.height=11}
+plot(modFit2$finalModel, uniform=TRUE, 
+      main="Classification Tree for Barbell Exercise")
+text(modFit2$finalModel, use.n=TRUE, all=TRUE, cex=.8)
+```
+
+#Predictions for Test Cases
+
+This algorithm makes the following predicts for the 20 observations in the test set:
+
+```{r,echo=FALSE,cache=TRUE}
+preds2<-predict(modFit2,newdata=testing[,relevant_cols])
+data.frame(testing$X,preds2)
+```
+
+
